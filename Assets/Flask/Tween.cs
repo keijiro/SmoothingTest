@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Runtime.InteropServices;
 
 namespace Flask
 {
@@ -114,21 +115,20 @@ namespace Flask
         }
     }
 
-/*
-    struct DTweenQuaternion
+    struct DTweenVector4
     {
-        public Quaternion position;
-        public Quaternion velocity;
+        public Vector4 position;
+        public Vector4 velocity;
         public float omega;
 
-        public DTweenQuaternion(Quaternion position, float omega)
+        public DTweenVector4(Vector4 position, float omega)
         {
             this.position = position;
-            this.velocity = Quaternion.zero;
+            this.velocity = Vector4.zero;
             this.omega = omega;
         }
 
-        public void Step(Quaternion target)
+        public void Step(Vector4 target)
         {
             var dt = Time.deltaTime;
             var n1 = velocity - (position - target) * (omega * omega * dt);
@@ -137,10 +137,57 @@ namespace Flask
             position += velocity * dt;
         }
 
-        public static implicit operator Quaternion(DTweenQuaternion m)
+        public static implicit operator Vector4(DTweenVector4 m)
         {
             return m.position;
         }
     }
-        */
+
+    struct DTweenQuaternion
+    {
+        [StructLayout(LayoutKind.Explicit)]
+        struct QVUnion
+        {
+            [FieldOffset(0)] public Vector4 v;
+            [FieldOffset(0)] public Quaternion q;
+        }
+
+        static Vector4 q2v(Quaternion q)
+        {
+            return new Vector4(q.x, q.y, q.z, q.w);
+        }
+
+        QVUnion _rotation;
+
+        public Quaternion rotation {
+            get { return _rotation.q; }
+            set { _rotation.q = value; }
+        }
+
+        public Vector4 velocity;
+        public float omega;
+
+        public DTweenQuaternion(Quaternion rotation, float omega)
+        {
+            _rotation.v = Vector4.zero; // needed for suppressing warnings
+            _rotation.q = rotation;
+            velocity = Vector4.zero;
+            this.omega = omega;
+        }
+
+        public void Step(Quaternion target)
+        {
+            var vtarget = q2v(target);
+            var dt = Time.deltaTime;
+            var n1 = velocity - (_rotation.v - vtarget) * (omega * omega * dt);
+            var n2 = 1 + omega * dt;
+            velocity = n1 / (n2 * n2);
+            _rotation.v = (_rotation.v + velocity * dt).normalized;
+        }
+
+        public static implicit operator Quaternion(DTweenQuaternion m)
+        {
+            return m.rotation;
+        }
+    }
 }
