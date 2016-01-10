@@ -178,6 +178,8 @@ namespace Flask
         public void Step(Quaternion target)
         {
             var vtarget = q2v(target);
+            // We can use either of vtarget/-vtarget. Use closer one.
+            if (Vector4.Dot(_rotation.v, vtarget) < 0) vtarget = -vtarget;
             var dt = Time.deltaTime;
             var n1 = velocity - (_rotation.v - vtarget) * (omega * omega * dt);
             var n2 = 1 + omega * dt;
